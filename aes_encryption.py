@@ -36,10 +36,55 @@ s_box = [
         '41', 16), int('99', 16), int('2d', 16), int('0f', 16), int('b0', 16), int('54', 16), int('bb', 16), int('16', 16)]
 ]
 
+round_constant = [
+    [int('01', 16), 00, 00, 00], 
+    [int('02', 16), 00, 00, 00], 
+    [int('04', 16), 00, 00, 00], 
+    [int('08', 16), 00, 00, 00], 
+    [int('10', 16), 00, 00, 00], 
+    [int('20', 16), 00, 00, 00], 
+    [int('40', 16), 00, 00, 00], 
+    [int('80', 16), 00, 00, 00], 
+    [int('1b', 16), 00, 00, 00], 
+    [int('36', 16), 00, 00, 00],
+]
+
 def split_list(lst, chunk_size):
     return [lst[i:i + chunk_size] for i in range(0, len(lst), chunk_size)]
 
+def byteSubstitution(words):
+    byte_substitution = []
+    for w in words:
+        # split string to single characters
+        o = re.findall('.', str(w).removeprefix('0x'))
+        row = 0
+        col = 0
+
+        if len(o) > 1:
+            row = int(o[0], 16)
+            col = int(o[1], 16)
+        else:
+            col = int(o[0], 16)
+            
+        byte_substitution.append(hex(s_box[row][col]))
+
+    return byte_substitution
+
+def g(word, round):
+    left_shift = numpy.roll(word, -1)
+    byte_substitution = byteSubstitution(left_shift)
+
+    gWord = []
+
+    for i in range(len(byte_substitution)):
+        gWord.append(hex(int(byte_substitution[i], 16) ^ round_constant[round][i]))
+
+    return gWord
+
+#==================================
+
 key = 'Thats my Kung Fu'
+# key = 'TOPSECRETMESSAGE'
 
 # Calculate pre round transform
 pre_round_key = []
@@ -47,36 +92,30 @@ pre_round_key = []
 for i in key :
     pre_round_key.append(hex(ord(i)))
 
-print('Pre round transform: ')
-print(pre_round_key)
-
 words = split_list(pre_round_key, 4)
-left_shift_w4 = numpy.roll(words[len(words) - 1], -1)
 
-# Byte Substitution
-byte_substitution = []
-for w4 in left_shift_w4:
-    # split string to single characters
-    o = re.findall('.', str(w4).removeprefix('0x'))
-    byte_substitution.append(hex(s_box[int(o[0])][int(o[1])]))
+round_key = []
 
-first_round_constant = [1, 00, 00, 00]
+for kRound in range(10):
+    g_w = g(words[len(words) - 1], kRound)
+    
+    newWordXorIndex = (len(words) - 1) - 3
 
-g_w4 = []
+    newWord = []
+    for i in range(len(words[newWordXorIndex])):
+        round_key.append(hex(int(words[newWordXorIndex][i], 16) ^ int(g_w[i], 16)))
+        newWord.append(hex(int(words[newWordXorIndex][i], 16) ^ int(g_w[i], 16)))
 
-for i in range(len(byte_substitution)):
-    g_w4.append(hex(int(byte_substitution[i], 16) ^ first_round_constant[i]))
+    # for w in words[kRound + 1:]:
+    for w in words[-3:]:
+        last_4 = round_key[-4:]
+        for j in range(len(w)):
+            round_key.append(hex(int(w[j], 16) ^ int(last_4[j], 16)))
+            newWord.append(hex(int(w[j], 16) ^ int(last_4[j], 16)))
 
+    words.extend(split_list(newWord, 4))
 
-first_round_key = []
+keys = split_list(round_key, 16)
 
-for i in range(len(words[0])):
-    first_round_key.append(hex(int(words[0][i], 16) ^ int(g_w4[i], 16)))
-
-for w in words[1:]:
-    last_4 = first_round_key[-4:]
-    for j in range(len(w)):
-        first_round_key.append(hex(int(w[j], 16) ^ int(last_4[j], 16)))
-
-print('First round key: ')
-print(first_round_key)
+for k in keys:
+    print(k)
