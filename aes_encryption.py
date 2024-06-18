@@ -81,41 +81,89 @@ def g(word, round):
 
     return gWord
 
-#==================================
+def textToHex(text):
+    hexChar = []
+    for i in text :
+        hexChar.append(hex(ord(i)))
 
-key = 'Thats my Kung Fu'
-# key = 'TOPSECRETMESSAGE'
+    return hexChar
 
-# Calculate pre round transform
-pre_round_key = []
+def keyExpansion(key):
 
-for i in key :
-    pre_round_key.append(hex(ord(i)))
+    # key = 'Thats my Kung Fu'
+    # key = 'TOPSECRETMESSAGE'
 
-words = split_list(pre_round_key, 4)
+    # Calculate pre round transform
+    pre_round_key = textToHex(key)
 
-round_key = []
+    words = split_list(pre_round_key, 4)
 
-for kRound in range(10):
-    g_w = g(words[len(words) - 1], kRound)
-    
-    newWordXorIndex = (len(words) - 1) - 3
+    round_key = pre_round_key
 
-    newWord = []
-    for i in range(len(words[newWordXorIndex])):
-        round_key.append(hex(int(words[newWordXorIndex][i], 16) ^ int(g_w[i], 16)))
-        newWord.append(hex(int(words[newWordXorIndex][i], 16) ^ int(g_w[i], 16)))
+    for kRound in range(10):
+        g_w = g(words[len(words) - 1], kRound)
+        
+        newWordXorIndex = (len(words) - 1) - 3
 
-    # for w in words[kRound + 1:]:
-    for w in words[-3:]:
-        last_4 = round_key[-4:]
-        for j in range(len(w)):
-            round_key.append(hex(int(w[j], 16) ^ int(last_4[j], 16)))
-            newWord.append(hex(int(w[j], 16) ^ int(last_4[j], 16)))
+        newWord = []
+        for i in range(len(words[newWordXorIndex])):
+            round_key.append(hex(int(words[newWordXorIndex][i], 16) ^ int(g_w[i], 16)))
+            newWord.append(hex(int(words[newWordXorIndex][i], 16) ^ int(g_w[i], 16)))
 
-    words.extend(split_list(newWord, 4))
+        for w in words[-3:]:
+            last_4 = round_key[-4:]
+            for j in range(len(w)):
+                round_key.append(hex(int(w[j], 16) ^ int(last_4[j], 16)))
+                newWord.append(hex(int(w[j], 16) ^ int(last_4[j], 16)))
 
-keys = split_list(round_key, 16)
+        words.extend(split_list(newWord, 4))
 
-for k in keys:
-    print(k)
+    #split 16 words for each keys
+    return split_list(round_key, 16)
+
+def listToStateMatrix(list):
+    matrix = [[0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]]
+    x = 0
+    for i in range(4):
+        for j in range(4):
+            matrix[j][i] = list[x]
+            x = x + 1
+
+    return matrix
+
+
+
+# ============== Entry point ============
+keys = keyExpansion('Thats my Kung Fu')
+
+plainText = 'Two One Nine Two'
+textInHex = textToHex(plainText)
+print(textInHex)
+
+stateMatrix = listToStateMatrix(textInHex)
+keyMatrix = listToStateMatrix(keys[0])
+
+print(stateMatrix)
+print(keyMatrix)
+
+# Add round key
+mXor = [[0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]]
+
+for i in range(4):
+    for j in range(4):
+        mXor[i][j] = hex(int(stateMatrix[i][j], 16) ^ int(keyMatrix[i][j], 16))
+
+print(mXor)
+
+# byteSubstitution
+for i in range(4):
+    mXor[i] = byteSubstitution(mXor[i])
+
+print(mXor)
+
+newArr = []
+for i in range(4):
+    newArr.append(numpy.roll(mXor[i], -i).tolist())
+
+print(newArr)
+
