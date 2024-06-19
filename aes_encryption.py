@@ -89,10 +89,6 @@ def textToHex(text):
     return hexChar
 
 def keyExpansion(key):
-
-    # key = 'Thats my Kung Fu'
-    # key = 'TOPSECRETMESSAGE'
-
     # Calculate pre round transform
     pre_round_key = textToHex(key)
 
@@ -131,6 +127,41 @@ def listToStateMatrix(list):
 
     return matrix
 
+# mixed column functions
+def mix_col_mult(a, b):
+    p = 0
+    hi_bit_set = 0
+    for _ in range(8):
+        if b & 1:
+            p ^= a
+        hi_bit_set = a & 0x80
+        a <<= 1
+        if hi_bit_set:
+            a ^= int('0x1B', 16)  # AES irreducible polynomial
+        b >>= 1
+    return p & 0xFF
+
+def mix_column(matrix):
+    predefMatrix = [
+        [int('02', 16), int('03', 16), int('01', 16), int('01', 16)], 
+        [int('01', 16), int('02', 16), int('03', 16), int('01', 16)], 
+        [int('01', 16), int('01', 16), int('02', 16), int('03', 16)], 
+        [int('03', 16), int('01', 16), int('01', 16), int('02', 16)],
+    ]
+
+    result = [[0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]]
+
+    for k in range(4):
+        for i in range(4):
+            valX = 0
+            for j in range(4):
+                val = mix_col_mult(predefMatrix[k][j], int(matrix[j][i], 16))
+                valX = valX ^ val
+                
+            result[k][i] = hex(valX)
+
+    return result
+
 
 
 # ============== Entry point ============
@@ -138,32 +169,41 @@ keys = keyExpansion('Thats my Kung Fu')
 
 plainText = 'Two One Nine Two'
 textInHex = textToHex(plainText)
-print(textInHex)
 
 stateMatrix = listToStateMatrix(textInHex)
-keyMatrix = listToStateMatrix(keys[0])
+firstKeyMatrix = listToStateMatrix(keys[0])
 
-print(stateMatrix)
-print(keyMatrix)
 
-# Add round key
-mXor = [[0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]]
-
+# Add pre round key
+resultMatrix = [[0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]]
 for i in range(4):
     for j in range(4):
-        mXor[i][j] = hex(int(stateMatrix[i][j], 16) ^ int(keyMatrix[i][j], 16))
+        resultMatrix[i][j] = hex(int(stateMatrix[i][j], 16) ^ int(firstKeyMatrix[i][j], 16))
 
-print(mXor)
 
-# byteSubstitution
+for round in range(10):
+    # byte sub
+    for i in range(4):
+        resultMatrix[i] = byteSubstitution(resultMatrix[i])
+
+    # Shift row
+    for i in range(4):
+        resultMatrix[i] = numpy.roll(resultMatrix[i], -i).tolist()
+
+    # mixed column
+    if round < 9:
+        resultMatrix = mix_column(resultMatrix)
+
+    # Add round key
+    roundKey = listToStateMatrix(keys[round + 1])
+
+    for i in range(4):
+        for j in range(4):
+            resultMatrix[i][j] = hex(int(resultMatrix[i][j], 16) ^ int(roundKey[i][j], 16))
+
+chiperText = []
 for i in range(4):
-    mXor[i] = byteSubstitution(mXor[i])
+    for j in range(4):
+        chiperText.append(resultMatrix[j][i])
 
-print(mXor)
-
-newArr = []
-for i in range(4):
-    newArr.append(numpy.roll(mXor[i], -i).tolist())
-
-print(newArr)
-
+print(chiperText)
